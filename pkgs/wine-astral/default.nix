@@ -23,8 +23,6 @@ in
     python3,
     gitMinimal,
     llvmBuild ? true,
-    enableAvx2 ? stdenv.hostPlatform.avx2Support,
-    enableFma ? stdenv.hostPlatform.fmaSupport,
     llvmPackages_latest,
     openxr-loader,
     bash,
@@ -284,16 +282,13 @@ in
           XDG_CACHE_HOME = "$src/build-cache";
           NIX_CFLAGS_COMPILE =
             builtins.concatStringsSep " "
-            (
-              [
-                "-Wno-error=implicit-function-declaration"
-                "-Wno-error=incompatible-pointer-types"
-                "-Wno-error=int-conversion"
-              ]
-              ++ lib.optional (! enableAvx2) "-mavx"
-              ++ lib.optional enableAvx2 "-mavx2"
-              ++ lib.optional enableFma "-mfma"
-            );
+            [
+              "-Wno-error=implicit-function-declaration"
+              "-Wno-error=incompatible-pointer-types"
+              "-Wno-error=int-conversion"
+              "-mavx2"
+              "-mfma"
+            ];
           NIX_LDFLAGS = "${old.env.NIX_LDFLAGS or ""} -flto=thin";
         };
 
