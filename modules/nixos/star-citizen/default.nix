@@ -150,7 +150,7 @@
       };
       enforceWaylandDrv = mkOption {
         type = types.bool;
-        default = false;
+        default = true;
         description = "enforce wayland drv if wayland is detected. May help with Vulkan though is problematic for some WMs. Also helps with cursor issues";
       };
     };

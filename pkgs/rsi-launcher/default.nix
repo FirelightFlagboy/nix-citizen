@@ -28,9 +28,12 @@
   glCacheSize ? 10737418240, # 10GB
   disableEac ? false,
   extraEnvVars ? {},
-  enforceWaylandDrv ? false, # May help with vulkan but causes issues w/ some WMs
+  # May help with vulkan but causes issues w/ some WMs
+  # Set this by default as there are cursor issues with this false
+  enforceWaylandDrv ? true,
   hidewine ? true,
-  hidetray ? false,
+  # Hide tray by default if wayland is enforced for now.
+  hidetray ? enforceWaylandDrv,
   launchCommand ? "%command%",
   # experiments ? false,
   ... # Dont error from extra args for compatibility
