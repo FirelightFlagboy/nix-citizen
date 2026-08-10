@@ -219,7 +219,7 @@ in
                 for trick in "${"\${tricks[@]}"}"; do
                    if [ "${"\${1:-}"}" = "--force-install" ] || (! winetricks list-installed | grep -qw "$trick"); then
                      echo "winetricks: Installing $trick"
-                     winetricks -q -f "$trick"
+                     y | winetricks -q -f "$trick"
                      tricksInstalled=0
                    fi
                 done
