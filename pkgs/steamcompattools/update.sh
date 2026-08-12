@@ -30,7 +30,7 @@ read -r GE_VER GE_URL GE_HASH _ < <(
   get_release \
     "proton-ge-bin" \
     "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases" \
-    "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/{version}/{version}.tar.gz" \
+    "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/{version}/{version}-{arch}.tar.gz" \
     "$ARCH"
 )
 
