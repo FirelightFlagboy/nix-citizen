@@ -1,0 +1,105 @@
+From dd965c2080c3c9d231e20696e0fac1da7132c6b2 Mon Sep 17 00:00:00 2001
+From: Vingian <89702391+Vingian@users.noreply.github.com>
+Date: Tue, 11 Aug 2026 07:14:06 -0300
+Subject: [PATCH] server: Preserve raw input messages for GetRawInputBuffer
+ when using RIDEV_NOLEGACY
+
+Raw inputs could be discarded by the normal message loop before GetRawInputBuffer reads them.
+---
+ server/queue.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/server/queue.c b/server/queue.c
+index b89a0dc5c6e..4c7d6714bfc 100644
+--- a/server/queue.c
++++ b/server/queue.c
+@@ -112,6 +112,7 @@ struct thread_input
+     int                    caret_state;   /* caret on/off state */
+     struct list            msg_list;      /* list of hardware messages */
+     timeout_t              user_time;     /* time of last user input */
++    unsigned int           rawinput_count;
+     unsigned char          desktop_keystate[256]; /* desktop keystate when keystate was synced */
+     input_shm_t           *shared;        /* thread input in session shared memory */
+ };
+@@ -214,6 +215,7 @@ static struct thread_input *create_thread_input( struct thread *thread )
+     {
+         list_init( &input->msg_list );
+         input->user_time = 0;
++        input->rawinput_count = 0;
+         input->shared = NULL;
+ 
+         if (!(input->desktop = get_thread_desktop( thread, 0 /* FIXME: access rights */ )))
+@@ -1727,6 +1729,7 @@ static void release_hardware_message( struct msg_queue *queue, unsigned int hw_i
+     if (clr_bit) clear_queue_bits( queue, clr_bit );
+ 
+     update_thread_input_key_state( input, msg->msg, msg->wparam );
++    if (msg->msg == WM_INPUT && input->rawinput_count) input->rawinput_count--;
+     list_remove( &msg->entry );
+     free_message( msg );
+ }
+@@ -1910,6 +1913,7 @@ static void queue_hardware_message( struct desktop *desktop, struct message *msg
+     if (!always_queue || merge_message( input, msg )) free_message( msg );
+     else
+     {
++        if (msg->msg == WM_INPUT) input->rawinput_count++;
+         msg->unique_id = 0;  /* will be set once we return it to the app */
+         list_add_tail( &input->msg_list, &msg->entry );
+         set_queue_bits( thread->queue, msg_bit );
+@@ -2693,15 +2697,16 @@ static int get_hardware_message( struct thread *thread, unsigned int hw_id, user
+                                  struct get_message_reply *reply )
+ {
+     struct thread_input *input = thread->queue->input;
+-    const struct rawinput_device *device;
++    const struct rawinput_device *device, *kbd_device;
+     struct thread *win_thread;
+     struct list *ptr;
+     user_handle_t win;
+     int clear_bits, got_one = 0;
+     unsigned int msg_code;
+-    int no_legacy;
++    int no_legacy, no_legacy_kbd;
+ 
+     no_legacy = (device = thread->process->rawinput_mouse) && (device->flags & RIDEV_NOLEGACY);
++    no_legacy_kbd = (kbd_device = thread->process->rawinput_kbd) && (kbd_device->flags & RIDEV_NOLEGACY);
+ 
+     ptr = list_head( &input->msg_list );
+     if (hw_id)
+@@ -2734,11 +2739,22 @@ static int get_hardware_message( struct thread *thread, unsigned int hw_id, user
+             free_message( msg );
+             continue;
+         }
++        if (msg->msg == WM_INPUT && ((data->rawinput.type == RIM_TYPEMOUSE && no_legacy) || (data->rawinput.type == RIM_TYPEKEYBOARD && no_legacy_kbd)))
++        {
++            if (input->rawinput_count > 0x100)
++            {
++                input->rawinput_count--;
++                list_remove( &msg->entry );
++                free_message( msg );
++            }
++            continue;
++        }
+         win = find_hardware_message_window( input->desktop, input, msg, &msg_code, &win_thread );
+         if (!win || !win_thread)
+         {
+             /* no window at all, remove it */
+             update_thread_input_key_state( input, msg->msg, msg->wparam );
++            if (msg->msg == WM_INPUT && input->rawinput_count) input->rawinput_count--;
+             list_remove( &msg->entry );
+             free_message( msg );
+             continue;
+@@ -2755,6 +2771,7 @@ static int get_hardware_message( struct thread *thread, unsigned int hw_id, user
+             {
+                 /* for another thread input, drop it */
+                 update_thread_input_key_state( input, msg->msg, msg->wparam );
++                if (msg->msg == WM_INPUT && input->rawinput_count) input->rawinput_count--;
+                 list_remove( &msg->entry );
+                 free_message( msg );
+             }
+@@ -4129,6 +4146,7 @@ DECL_HANDLER(get_rawinput_buffer)
+ 
+                 total_size += (rawinput->header.dwSize + align) & ~align;
+                 reply->time = msg->time;
++                if (queue->input->rawinput_count) queue->input->rawinput_count--;
+                 list_remove( &msg->entry );
+                 free_message( msg );
+                 count++;
