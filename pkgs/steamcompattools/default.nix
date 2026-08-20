@@ -23,7 +23,7 @@
   # v4 = stdenv.targetPlatform.isx86_64 && stdenv.targetPlatform.avx512Support;
   v3 = stdenv.targetPlatform.isx86_64 && stdenv.targetPlatform.avxSupport;
   # v2 = stdenv.targetPlatform.isx86_64 && stdenv.targetPlatform.sse4_2Support;
-  arm = stdenv.isAarch64;
+  arm = stdenv.targetPlatform.isAarch64;
 in
   lib.recurseIntoAttrs {
     proton-ge-bin = mkCompatTool {
